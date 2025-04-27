@@ -1,81 +1,76 @@
 #!/bin/bash
+
 max_depth=0
 input_dir=""
 output_dir=""
+args=("$@")
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --max_depth=*)
-            max_depth="${1#*=}"
-            if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
-                echo "Error: max_depth must be a positive integer" >&2
-                exit 1
-            fi
-            shift
-            ;;
-        *)
-            if [[ -z "$input_dir" ]]; then
-                input_dir="$1"
-            elif [[ -z "$output_dir" ]]; then
-                output_dir="$1"
-            else
-                echo "Error: Too many arguments" >&2
-                exit 1
-            fi
-            shift
-            ;;
-    esac
+for i in "${!args[@]}"; do
+    if [[ "${args[i]}" == --max_depth=* ]]; then
+        max_depth="${args[i]#*=}"
+        if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
+            echo "Error: max_depth must be a positive integer" >&2
+            exit 1
+        fi
+        unset 'args[i]'
+    fi
 done
 
-if [[ -z "$input_dir" || -z "$output_dir" ]]; then
+args=("${args[@]}")
+
+if [[ ${#args[@]} -ne 2 ]]; then
     echo "Usage: $0 [--max_depth=N] input_dir output_dir" >&2
     exit 1
 fi
 
+input_dir="${args[0]}"
+output_dir="${args[1]}"
+
 if [[ ! -d "$input_dir" ]]; then
-    echo "Error: Input directory does not exist" >&2
+    echo "Error: Input directory '$input_dir' does not exist" >&2
     exit 1
 fi
 
 mkdir -p "$output_dir"
 
 python3 -c "
-import sys
 import os
 import shutil
+import sys
 
-def main():
-    input_dir = sys.argv[1]
-    output_dir = sys.argv[2]
-    max_depth = int(sys.argv[3]) if sys.argv[3] else 0
+input_dir = sys.argv[1]
+output_dir = sys.argv[2]
+max_depth = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 
-    if max_depth == 0:
-        max_depth = float('inf')
+def copy_file(src, dst_dir):
+    base = os.path.basename(src)
+    dst_path = os.path.join(dst_dir, base)
+    counter = 1
 
-    def copy_file(src_path):
-        base_name = os.path.basename(src_path)
-        dest_path = os.path.join(output_dir, base_name)
+    while os.path.exists(dst_path):
+        name, ext = os.path.splitext(base)
+        dst_path = os.path.join(dst_dir, f'{name}_{counter}{ext}')
+        counter += 1
 
-        counter = 1
-        name, ext = os.path.splitext(base_name)
-        while os.path.exists(dest_path):
-            new_name = f"{name}_{counter}{ext}"
-            dest_path = os.path.join(output_dir, new_name)
-            counter += 1
+    shutil.copy2(src, dst_path)
 
-        shutil.copy2(src_path, dest_path)
+def process_dir(current_dir, current_depth):
+    try:
+        for item in os.listdir(current_dir):
+            path = os.path.join(current_dir, item)
+            if os.path.isfile(path):
+                copy_file(path, output_dir)
+            elif os.path.isdir(path):
+                if max_depth == 0 or current_depth < max_depth:
+                    process_dir(path, current_depth + 1)
+    except Exception as e:
+        print(f'Error: {str(e)}', file=sys.stderr)
+        sys.exit(1)
 
-    for root, _, files in os.walk(input_dir):
-        current_depth = root[len(input_dir):].count(os.sep)
-        if current_depth > max_depth:
-            continue
-
-        for file in files:
-            src_path = os.path.join(root, file)
-            copy_file(src_path)
-
-if __name__ == "__main__":
-    main()
-END_PYTHON
+try:
+    process_dir(input_dir, 0)
+except KeyboardInterrupt:
+    sys.exit(1)
+" "$input_dir" "$output_dir" "$max_depth"
 
 exit 0
