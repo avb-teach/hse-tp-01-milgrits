@@ -1,39 +1,45 @@
 #!/bin/bash
-
-if ! command -v python3 &> /dev/null; then
-    echo "Ошибка: Python3 не установлен" >&2
-    exit 1
-fi
-
 max_depth=0
 input_dir=""
 output_dir=""
 
-if [[ "$1" == --max_depth=* ]]; then
-    max_depth="${1#--max_depth=}"
-    if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
-        echo "Ошибка: значение max_depth должно быть целым числом" >&2
-        exit 1
-    fi
-    shift
-fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --max_depth=*)
+            max_depth="${1#*=}"
+            if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
+                echo "Error: max_depth must be a positive integer" >&2
+                exit 1
+            fi
+            shift
+            ;;
+        *)
+            if [[ -z "$input_dir" ]]; then
+                input_dir="$1"
+            elif [[ -z "$output_dir" ]]; then
+                output_dir="$1"
+            else
+                echo "Error: Too many arguments" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
 
-if [[ $# -ne 2 ]]; then
-    echo "Использование: $0 [--max_depth=N] исходная_директория целевая_директория" >&2
+if [[ -z "$input_dir" || -z "$output_dir" ]]; then
+    echo "Usage: $0 [--max_depth=N] input_dir output_dir" >&2
     exit 1
 fi
 
-input_dir="$1"
-output_dir="$2"
-
 if [[ ! -d "$input_dir" ]]; then
-    echo "Ошибка: исходная директория не существует" >&2
+    echo "Error: Input directory does not exist" >&2
     exit 1
 fi
 
 mkdir -p "$output_dir"
 
-python3 - "$input_dir" "$output_dir" "$max_depth" <<'END_PYTHON'
+python3 -c "
 import sys
 import os
 import shutil
