@@ -3,28 +3,43 @@
 max_depth=0
 input_dir=""
 output_dir=""
-args=("$@")
 
-for i in "${!args[@]}"; do
-    if [[ "${args[i]}" == --max_depth=* ]]; then
-        max_depth="${args[i]#*=}"
-        if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
-            echo "Error: max_depth must be a positive integer" >&2
-            exit 1
-        fi
-        unset 'args[i]'
-    fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --max_depth)
+            max_depth="$2"
+            if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
+                echo "Error: max_depth must be a positive integer" >&2
+                exit 1
+            fi
+            shift 2
+            ;;
+        --max_depth=*)
+            max_depth="${1#*=}"
+            if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
+                echo "Error: max_depth must be a positive integer" >&2
+                exit 1
+            fi
+            shift
+            ;;
+        *)
+            if [[ -z "$input_dir" ]]; then
+                input_dir="$1"
+            elif [[ -z "$output_dir" ]]; then
+                output_dir="$1"
+            else
+                echo "Error: Too many arguments" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
 done
 
-args=("${args[@]}")
-
-if [[ ${#args[@]} -ne 2 ]]; then
-    echo "Usage: $0 [--max_depth=N] input_dir output_dir" >&2
+if [[ -z "$input_dir" || -z "$output_dir" ]]; then
+    echo "Usage: $0 [--max_depth N] input_dir output_dir" >&2
     exit 1
 fi
-
-input_dir="${args[0]}"
-output_dir="${args[1]}"
 
 if [[ ! -d "$input_dir" ]]; then
     echo "Error: Input directory '$input_dir' does not exist" >&2
