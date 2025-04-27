@@ -1,84 +1,56 @@
 #!/bin/bash
 
-max_depth=0
-input_dir=""
-output_dir=""
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --max_depth=*)
-            max_depth="${1#*=}"
-            shift
-            ;;
-        --max_depth)
-            shift
-            max_depth="$1"
-            shift
-            ;;
-        *)
-            if [[ -z "$input_dir" ]]; then
-                input_dir="$1"
-            elif [[ -z "$output_dir" ]]; then
-                output_dir="$1"
-            else
-                echo "Unknown argument: $1" >&2
-                exit 1
-            fi
-            shift
-            ;;
-    esac
-done
-
-if [[ -z "$input_dir" || -z "$output_dir" ]]; then
-    echo "Usage: $0 input_dir output_dir [--max_depth=N]" >&2
-    exit 1
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 /path/to/input_dir /path/to/output_dir [--max_depth N]"
+  exit 1
 fi
 
-if [[ ! -d "$input_dir" ]]; then
-    echo "Input directory does not exist: $input_dir" >&2
-    exit 1
+INPUT_DIR=$1
+OUTPUT_DIR=$2
+MAX_DEPTH_FLAG=false
+MAX_DEPTH=0
+
+if [ "$#" -eq 4 ] && [ "$3" == "--max_depth" ]; then
+  MAX_DEPTH_FLAG=true
+  MAX_DEPTH=$4
 fi
 
-mkdir -p "$output_dir"
+if [ ! -d "$INPUT_DIR" ]; then
+  echo "Input directory does not exist."
+  exit 1
+fi
 
-python3 - "$input_dir" "$output_dir" "$max_depth" <<'EOF'
+mkdir -p "$OUTPUT_DIR"
+
+python3 - <<EOF
 import os
 import shutil
 import sys
 
-input_dir = sys.argv[1]
-output_dir = sys.argv[2]
-try:
-    max_depth = int(sys.argv[3])
-except (IndexError, ValueError):
-    max_depth = 0
+input_dir = "$INPUT_DIR"
+output_dir = "$OUTPUT_DIR"
+max_depth_flag = $MAX_DEPTH_FLAG
+max_depth = int("$MAX_DEPTH")
 
-for root, dirs, files in os.walk(input_dir):
-    rel_path = os.path.relpath(root, input_dir)
-    depth = 0 if rel_path == "." else rel_path.count(os.sep) + 1
+def copy_files(src_dir, dest_dir, current_depth=0):
+    if max_depth_flag and current_depth > max_depth:
+        return
 
-    if max_depth > 0 and depth > max_depth:
-        dirs.clear()
-        continue
+    for root, _, files in os.walk(src_dir):
+        depth = root[len(src_dir):].count(os.sep)
+        if max_depth_flag and depth > max_depth:
+            continue
 
-    dest_dir = output_dir
-    if rel_path != ".":
-        dest_dir = os.path.join(output_dir, rel_path)
+        for file in files:
+            src_file = os.path.join(root, file)
+            dest_file = os.path.join(dest_dir, file)
+            counter = 1
+            while os.path.exists(dest_file):
+                name, ext = os.path.splitext(file)
+                dest_file = os.path.join(dest_dir, f"{name}{counter}{ext}")
+                counter += 1
 
-    os.makedirs(dest_dir, exist_ok=True)
+            shutil.copy2(src_file, dest_file)
 
-    for file in files:
-        if max_depth > 0 and depth > max_depth:
-            continue  # Skip files deeper than allowed depth
-
-        src_file = os.path.join(root, file)
-        dest_file = os.path.join(dest_dir, file)
-
-        base, ext = os.path.splitext(file)
-        counter = 1
-        while os.path.exists(dest_file):
-            dest_file = os.path.join(dest_dir, f"{base}_{counter}{ext}")
-            counter += 1
-
-        shutil.copy2(src_file, dest_file)
+copy_files(input_dir, output_dir)
 EOF
