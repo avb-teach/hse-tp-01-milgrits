@@ -51,9 +51,9 @@ def copy_with_depth():
         dirs.sort()
         files.sort()
         rel_path = os.path.relpath(root, input_dir)
-        current_depth = len(rel_path.split(os.sep)) if rel_path != '.' else 0
+        current_depth = rel_path.count(os.sep) if rel_path != '.' else 0
 
-        if max_depth > 0 and current_depth > max_depth:
+        if max_depth > 0 and current_depth >= max_depth:
             continue
 
         for file in files:
