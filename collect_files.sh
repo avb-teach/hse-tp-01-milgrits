@@ -1,12 +1,9 @@
 #!/bin/bash
 
-# collect_files.sh
-
 max_depth=0
 input_dir=""
 output_dir=""
 
-# Correctly parse positional args and optional --max_depth
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --max_depth=*)
@@ -24,7 +21,7 @@ while [[ $# -gt 0 ]]; do
             elif [[ -z "$output_dir" ]]; then
                 output_dir="$1"
             else
-                echo "Unknown extra argument: $1" >&2
+                echo "Unknown argument: $1" >&2
                 exit 1
             fi
             shift
@@ -44,35 +41,35 @@ fi
 
 mkdir -p "$output_dir"
 
-python3 - <<EOF
+python3 - "$input_dir" "$output_dir" "$max_depth" <<'EOF'
 import os
 import shutil
 import sys
 
 input_dir = sys.argv[1]
 output_dir = sys.argv[2]
-max_depth = int(sys.argv[3])
+try:
+    max_depth = int(sys.argv[3])
+except (IndexError, ValueError):
+    max_depth = 0
 
 for root, dirs, files in os.walk(input_dir):
     rel_path = os.path.relpath(root, input_dir)
-    current_depth = rel_path.count(os.sep)
+    depth = 0 if rel_path == "." else rel_path.count(os.sep) + 1
 
-    if max_depth > 0 and current_depth >= max_depth:
-        dirs.clear()
-
-    target_dir = os.path.normpath(os.path.join(output_dir, rel_path))
-    os.makedirs(target_dir, exist_ok=True)
+    if max_depth > 0 and depth > max_depth:
+        dirs[:] = []  # Don't walk deeper
+        continue
 
     for file in files:
         src_file = os.path.join(root, file)
-        dest_file = os.path.join(target_dir, file)
+        dest_file = os.path.join(output_dir, file)
 
         base, ext = os.path.splitext(file)
         counter = 1
-
         while os.path.exists(dest_file):
-            dest_file = os.path.join(target_dir, f"{base}_{counter}{ext}")
+            dest_file = os.path.join(output_dir, f"{base}_{counter}{ext}")
             counter += 1
 
         shutil.copy2(src_file, dest_file)
-EOF "$input_dir" "$output_dir" "$max_depth"
+EOF
