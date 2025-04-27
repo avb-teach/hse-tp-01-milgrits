@@ -48,6 +48,8 @@ max_depth = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 
 def copy_with_depth():
     for root, dirs, files in os.walk(input_dir):
+        dirs.sort()   # Сортируем директории
+        files.sort()  # Сортируем файлы
         rel_path = os.path.relpath(root, input_dir)
         if rel_path == '.':
             depth = 0
