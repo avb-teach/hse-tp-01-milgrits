@@ -37,40 +37,37 @@ fi
 
 mkdir -p "$output_dir"
 
-python3 -c "
+python3 - <<EOF
 import os
 import shutil
 import sys
 
 input_dir = sys.argv[1]
 output_dir = sys.argv[2]
-max_depth = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+max_depth = int(sys.argv[3])
 
-def copy_with_depth():
-    for root, dirs, files in os.walk(input_dir):
-        dirs.sort()
-        files.sort()
-        rel_path = os.path.relpath(root, input_dir)
-        if rel_path == '.':
-            current_depth = 0
-        else:
-            current_depth = rel_path.count(os.sep) + 1
+for root, dirs, files in os.walk(input_dir):
+    rel_path = os.path.relpath(root, input_dir)
+    current_depth = rel_path.count(os.sep)
 
-        if max_depth > 0 and current_depth > max_depth:
-            continue
+    if max_depth > 0 and current_depth >= max_depth:
+        # Don't go deeper
+        dirs.clear()
 
-        for file in files:
-            src = os.path.join(root, file)
-            base_name = os.path.basename(src)
-            dest = os.path.join(output_dir, base_name)
+    target_dir = os.path.normpath(os.path.join(output_dir, rel_path))
+    os.makedirs(target_dir, exist_ok=True)
 
-            counter = 1
-            while os.path.exists(dest):
-                name, ext = os.path.splitext(base_name)
-                dest = os.path.join(output_dir, f'{name}_{counter}{ext}')
-                counter += 1
+    for file in files:
+        src_file = os.path.join(root, file)
+        dest_file = os.path.join(target_dir, file)
 
-            shutil.copy2(src, dest)
+        base, ext = os.path.splitext(file)
+        counter = 1
 
-copy_with_depth()
-" "$input_dir" "$output_dir" "$max_depth"
+        # Handle duplicate file names
+        while os.path.exists(dest_file):
+            dest_file = os.path.join(target_dir, f"{base}_{counter}{ext}")
+            counter += 1
+
+        shutil.copy2(src_file, dest_file)
+EOF
