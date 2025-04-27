@@ -58,17 +58,19 @@ for root, dirs, files in os.walk(input_dir):
     depth = 0 if rel_path == "." else rel_path.count(os.sep) + 1
 
     if max_depth > 0 and depth > max_depth:
-        dirs.clear()  # Don't go deeper
+        dirs.clear()
         continue
 
+    dest_dir = output_dir
     if rel_path != ".":
         dest_dir = os.path.join(output_dir, rel_path)
-    else:
-        dest_dir = output_dir
 
     os.makedirs(dest_dir, exist_ok=True)
 
     for file in files:
+        if max_depth > 0 and depth > max_depth:
+            continue  # Skip files deeper than allowed depth
+
         src_file = os.path.join(root, file)
         dest_file = os.path.join(dest_dir, file)
 
