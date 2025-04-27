@@ -70,7 +70,7 @@ def copy_file(src, dst_dir):
     shutil.copy2(src, dest_path)
 
 def process_dir(current_dir, current_depth):
-    if max_depth > 0 and current_depth > max_depth:
+    if max_depth > 0 and current_depth >= max_depth:
         return
 
     for item in os.listdir(current_dir):
