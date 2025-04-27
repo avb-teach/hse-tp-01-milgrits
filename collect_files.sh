@@ -6,30 +6,19 @@ output_dir=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --max_depth)
-            max_depth="$2"
-            if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
-                echo "Error: max_depth must be a positive integer" >&2
-                exit 1
-            fi
-            shift 2
-            ;;
         --max_depth=*)
             max_depth="${1#*=}"
-            if [[ ! "$max_depth" =~ ^[0-9]+$ ]]; then
-                echo "Error: max_depth must be a positive integer" >&2
-                exit 1
-            fi
             shift
+            ;;
+        --max_depth)
+            max_depth="$2"
+            shift 2
             ;;
         *)
             if [[ -z "$input_dir" ]]; then
                 input_dir="$1"
-            elif [[ -z "$output_dir" ]]; then
-                output_dir="$1"
             else
-                echo "Error: Too many arguments" >&2
-                exit 1
+                output_dir="$1"
             fi
             shift
             ;;
@@ -42,7 +31,7 @@ if [[ -z "$input_dir" || -z "$output_dir" ]]; then
 fi
 
 if [[ ! -d "$input_dir" ]]; then
-    echo "Error: Input directory does not exist" >&2
+    echo "Input directory does not exist" >&2
     exit 1
 fi
 
@@ -57,34 +46,26 @@ input_dir = sys.argv[1]
 output_dir = sys.argv[2]
 max_depth = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 
-def copy_file(src, dst_dir):
-    base = os.path.basename(src)
-    dest_path = os.path.join(dst_dir, base)
-    counter = 1
+def copy_with_depth():
+    for root, dirs, files in os.walk(input_dir):
+        rel_path = os.path.relpath(root, input_dir)
+        depth = rel_path.count(os.sep) if rel_path != '.' else 0
 
-    while os.path.exists(dest_path):
-        name, ext = os.path.splitext(base)
-        dest_path = os.path.join(dst_dir, f'{name}_{counter}{ext}')
-        counter += 1
+        if max_depth > 0 and depth >= max_depth:
+            continue
 
-    shutil.copy2(src, dest_path)
+        for file in files:
+            src = os.path.join(root, file)
+            base_name = os.path.basename(src)
+            dest = os.path.join(output_dir, base_name)
 
-def process_dir(current_dir, current_depth):
-    if max_depth > 0 and current_depth >= max_depth:
-        return
+            counter = 1
+            while os.path.exists(dest):
+                name, ext = os.path.splitext(base_name)
+                dest = os.path.join(output_dir, f'{name}_{counter}{ext}')
+                counter += 1
 
-    for item in os.listdir(current_dir):
-        path = os.path.join(current_dir, item)
-        if os.path.isfile(path):
-            copy_file(path, output_dir)
-        elif os.path.isdir(path):
-            process_dir(path, current_depth + 1)
+            shutil.copy2(src, dest)
 
-try:
-    process_dir(input_dir, 0)
-except Exception as e:
-    print(f'Error: {str(e)}', file=sys.stderr)
-    sys.exit(1)
+copy_with_depth()
 " "$input_dir" "$output_dir" "$max_depth"
-
-exit 0
