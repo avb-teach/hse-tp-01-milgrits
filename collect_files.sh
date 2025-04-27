@@ -1,9 +1,12 @@
 #!/bin/bash
 
+# collect_files.sh
+
 max_depth=0
 input_dir=""
 output_dir=""
 
+# Correctly parse positional args and optional --max_depth
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --max_depth=*)
@@ -11,14 +14,18 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --max_depth)
-            max_depth="$2"
-            shift 2
+            shift
+            max_depth="$1"
+            shift
             ;;
         *)
             if [[ -z "$input_dir" ]]; then
                 input_dir="$1"
-            else
+            elif [[ -z "$output_dir" ]]; then
                 output_dir="$1"
+            else
+                echo "Unknown extra argument: $1" >&2
+                exit 1
             fi
             shift
             ;;
@@ -26,12 +33,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$input_dir" || -z "$output_dir" ]]; then
-    echo "Usage: $0 [--max_depth=N] input_dir output_dir" >&2
+    echo "Usage: $0 input_dir output_dir [--max_depth=N]" >&2
     exit 1
 fi
 
 if [[ ! -d "$input_dir" ]]; then
-    echo "Input directory does not exist" >&2
+    echo "Input directory does not exist: $input_dir" >&2
     exit 1
 fi
 
@@ -51,7 +58,6 @@ for root, dirs, files in os.walk(input_dir):
     current_depth = rel_path.count(os.sep)
 
     if max_depth > 0 and current_depth >= max_depth:
-        # Don't go deeper
         dirs.clear()
 
     target_dir = os.path.normpath(os.path.join(output_dir, rel_path))
@@ -64,10 +70,9 @@ for root, dirs, files in os.walk(input_dir):
         base, ext = os.path.splitext(file)
         counter = 1
 
-        # Handle duplicate file names
         while os.path.exists(dest_file):
             dest_file = os.path.join(target_dir, f"{base}_{counter}{ext}")
             counter += 1
 
         shutil.copy2(src_file, dest_file)
-EOF
+EOF "$input_dir" "$output_dir" "$max_depth"
